@@ -1,6 +1,9 @@
 package main
 
 import (
+	"github.com/auth0/go-jwt-middleware"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
@@ -21,6 +24,8 @@ const (
 	ES_URL      = "http://35.231.17.139:9200/"
 	BUCKET_NAME = "post-image-sylvan-ocean-206503"
 )
+
+var mySigningKey = []byte("jingwang")
 
 type Location struct {
 	Lat float64 `json:"lat"`
@@ -48,8 +53,12 @@ func handlerPost(w http.ResponseWriter, r *http.Request) {
 	lat, _ := strconv.ParseFloat(r.FormValue("lat"), 64)
 	lon, _ := strconv.ParseFloat(r.FormValue("lon"), 64)
 
+	user := r.Context().Value("user")
+	claims := user.(*jwt.Token).Claims
+	username := claims.(jwt.MapClaims)["username"]
+
 	p := &Post{
-		User:    "1111",
+		User:    username.(string),
 		Message: r.FormValue("message"),
 		Location: Location{
 			Lat: lat,
@@ -222,7 +231,22 @@ func main() {
 	}
 
 	fmt.Println("Service started")
-	http.HandleFunc("/post", handlerPost)
-	http.HandleFunc("/search", handlerSearch)
+
+	r := mux.NewRouter()
+	var jwtMiddleware = jwtmiddleware.New(jwtmiddleware.Options{
+		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
+			return mySigningKey, nil
+		},
+		SigningMethod: jwt.SigningMethodHS256,
+	})
+
+	//http.HandlerFunc("/post", handlerPost)
+	r.Handle("/post", jwtMiddleware.Handler(http.HandlerFunc(handlerPost))).Methods("POST")
+	r.Handle("/search", jwtMiddleware.Handler(http.HandlerFunc(handlerSearch))).Methods("GET")
+	r.Handle("/login", http.HandlerFunc(loginHandler)).Methods("POST")
+	r.Handle("/signup", http.HandlerFunc(signupHandler)).Methods("POST")
+
+	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(":8080", nil))
+
 }
