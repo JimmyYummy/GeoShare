@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/auth0/go-jwt-middleware"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
 	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/auth0/go-jwt-middleware"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 	"github.com/pborman/uuid"
 	elastic "gopkg.in/olivere/elastic.v3"
 	"io"

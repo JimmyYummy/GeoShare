@@ -24,8 +24,8 @@ var (
 type User struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-	Age int `json:"age"`
-	Gender string `json:"gender"`
+	Age      int    `json:"age"`
+	Gender   string `json:"gender"`
 }
 
 func checkUser(username, password string) bool {
@@ -38,10 +38,10 @@ func checkUser(username, password string) bool {
 	//search with a term query
 	termQuery := elastic.NewTermQuery("username", username)
 	queryResult, err := es_client.Search().
-						Index(INDEX).
-						Query(termQuery).
-						Pretty(true).
-						Do()
+		Index(INDEX).
+		Query(termQuery).
+		Pretty(true).
+		Do()
 	if err != nil {
 		fmt.Printf("ES query failed: %v\n", err)
 		return false
@@ -65,10 +65,10 @@ func addUser(user User) bool {
 
 	termQuery := elastic.NewTermQuery("username", user.Username)
 	queryResult, err := es_client.Search().
-						Index(INDEX).
-						Query(termQuery).
-						Pretty(true).
-						Do()
+		Index(INDEX).
+		Query(termQuery).
+		Pretty(true).
+		Do()
 	if err != nil {
 		fmt.Printf("ES query failed: %v\n", err)
 		return false
@@ -78,13 +78,13 @@ func addUser(user User) bool {
 		fmt.Printf("Username %s already exists.", user.Username)
 	}
 
-	_,err = es_client.Index().
-			Index(INDEX).
-			Type(TYPE_USER).
-			Id(user.Username).
-			BodyJson(user).
-			Refresh(true).
-			Do()
+	_, err = es_client.Index().
+		Index(INDEX).
+		Type(TYPE_USER).
+		Id(user.Username).
+		BodyJson(user).
+		Refresh(true).
+		Do()
 	if err != nil {
 		fmt.Printf("Failed to save user: %v\n", err)
 		return false
@@ -94,7 +94,7 @@ func addUser(user User) bool {
 }
 
 // if signed up, a new seesion is created
-func signupHandler(w http.ResponseWriter, r* http.Request) {
+func signupHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Received on signup request")
 	decoder := json.NewDecoder(r.Body)
 	var u User
@@ -106,7 +106,7 @@ func signupHandler(w http.ResponseWriter, r* http.Request) {
 		if addUser(u) {
 			fmt.Println("User added successfully.")
 			w.Write([]byte("User added successfully."))
-	 	} else {
+		} else {
 			fmt.Println("Failed to add a new user.")
 			http.Error(w, "Failed to add a new user", http.StatusInternalServerError)
 		}
@@ -125,24 +125,24 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var u User
 	if err := decoder.Decode(&u); err != nil {
-		   panic(err)
+		panic(err)
 	}
 
 	if checkUser(u.Username, u.Password) {
-		   token := jwt.New(jwt.SigningMethodHS256)
-		   claims := token.Claims.(jwt.MapClaims)
-		   /* Set token claims */
-		   claims["username"] = u.Username
-		   claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+		token := jwt.New(jwt.SigningMethodHS256)
+		claims := token.Claims.(jwt.MapClaims)
+		/* Set token claims */
+		claims["username"] = u.Username
+		claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
 
-		   /* Sign the token with our secret */
-		   tokenString, _ := token.SignedString(mySigningKey)
+		/* Sign the token with our secret */
+		tokenString, _ := token.SignedString(mySigningKey)
 
-		   /* Finally, write the token to the browser window */
-		   w.Write([]byte(tokenString))
+		/* Finally, write the token to the browser window */
+		w.Write([]byte(tokenString))
 	} else {
-		   fmt.Println("Invalid password or username.")
-		   http.Error(w, "Invalid password or username", http.StatusForbidden)
+		fmt.Println("Invalid password or username.")
+		http.Error(w, "Invalid password or username", http.StatusForbidden)
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
