@@ -1,20 +1,21 @@
 package main
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/auth0/go-jwt-middleware"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
-	"github.com/pborman/uuid"
-	elastic "gopkg.in/olivere/elastic.v3"
 	"io"
 	"log"
 	"net/http"
 	"reflect"
 	"strconv"
+
+	"cloud.google.com/go/storage"
+	"github.com/auth0/go-jwt-middleware"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
+	"github.com/pborman/uuid"
+	elastic "gopkg.in/olivere/elastic.v3"
 )
 
 const (
@@ -39,6 +40,58 @@ type Post struct {
 	Message  string   `json:"message"`
 	Location Location `json:"location"`
 	Url      string   `json:"url"`
+}
+
+func main() {
+	// Create a client
+	client, err := elastic.NewClient(elastic.SetURL(ES_URL), elastic.SetSniff(false))
+	if err != nil {
+		panic(err)
+	}
+
+	// Use the IndexExists service to check if a specified index exists.
+	exists, err := client.IndexExists(INDEX).Do()
+	if err != nil {
+		panic(err)
+	}
+	if !exists {
+		// Create a new index.
+		mapping := `{
+			"mappings":{
+				"post":{
+					"properties":{
+						"location":{
+							"type":"geo_point"
+						}
+					}
+				}
+			}
+		}`
+		_, err := client.CreateIndex(INDEX).Body(mapping).Do()
+		if err != nil {
+			// Handle error
+			panic(err)
+		}
+	}
+
+	fmt.Println("Service started")
+
+	r := mux.NewRouter()
+	var jwtMiddleware = jwtmiddleware.New(jwtmiddleware.Options{
+		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
+			return mySigningKey, nil
+		},
+		SigningMethod: jwt.SigningMethodHS256,
+	})
+
+	//http.HandlerFunc("/post", handlerPost)
+	r.Handle("/post", jwtMiddleware.Handler(http.HandlerFunc(handlerPost))).Methods("POST")
+	r.Handle("/search", jwtMiddleware.Handler(http.HandlerFunc(handlerSearch))).Methods("GET")
+	r.Handle("/login", http.HandlerFunc(loginHandler)).Methods("POST")
+	r.Handle("/signup", http.HandlerFunc(signupHandler)).Methods("POST")
+
+	http.Handle("/", r)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func handlerPost(w http.ResponseWriter, r *http.Request) {
@@ -196,57 +249,4 @@ func handlerSearch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Write(js)
-}
-
-func main() {
-	// Create a client
-	client, err := elastic.NewClient(elastic.SetURL(ES_URL), elastic.SetSniff(false))
-	if err != nil {
-		panic(err)
-	}
-
-	// Use the IndexExists service to check if a specified index exists.
-	exists, err := client.IndexExists(INDEX).Do()
-	if err != nil {
-		panic(err)
-	}
-	if !exists {
-		// Create a new index.
-		mapping := `{
-			"mappings":{
-				"post":{
-					"properties":{
-						"location":{
-							"type":"geo_point"
-						}
-					}
-				}
-			}
-		}`
-		_, err := client.CreateIndex(INDEX).Body(mapping).Do()
-		if err != nil {
-			// Handle error
-			panic(err)
-		}
-	}
-
-	fmt.Println("Service started")
-
-	r := mux.NewRouter()
-	var jwtMiddleware = jwtmiddleware.New(jwtmiddleware.Options{
-		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
-			return mySigningKey, nil
-		},
-		SigningMethod: jwt.SigningMethodHS256,
-	})
-
-	//http.HandlerFunc("/post", handlerPost)
-	r.Handle("/post", jwtMiddleware.Handler(http.HandlerFunc(handlerPost))).Methods("POST")
-	r.Handle("/search", jwtMiddleware.Handler(http.HandlerFunc(handlerSearch))).Methods("GET")
-	r.Handle("/login", http.HandlerFunc(loginHandler)).Methods("POST")
-	r.Handle("/signup", http.HandlerFunc(signupHandler)).Methods("POST")
-
-	http.Handle("/", r)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-
 }
