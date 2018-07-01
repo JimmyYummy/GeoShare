@@ -76,6 +76,7 @@ func addUser(user User) bool {
 
 	if queryResult.TotalHits() > 0 {
 		fmt.Printf("Username %s already exists.", user.Username)
+		return false
 	}
 
 	_, err = es_client.Index().
@@ -85,6 +86,7 @@ func addUser(user User) bool {
 		BodyJson(user).
 		Refresh(true).
 		Do()
+
 	if err != nil {
 		fmt.Printf("Failed to save user: %v\n", err)
 		return false
